@@ -94,6 +94,8 @@ def main(eval=True):
         for index, row in tqdm(test_xnli.iterrows(), total=test_xnli.shape[0]):
             out = model(row["premise"], row["hypothesis"])
             test_xnli.at[index, "pred"] = int(torch.max(out.data, 1)[1].cpu().numpy())
+        accu = sum(test_xnli["label"] == test_xnli["pred"]) / test_xnli.shape[0]
+        print("Accuracy on whole testset: ", round(accu, 2) * 100)
 
 
 if __name__ == "__main__":

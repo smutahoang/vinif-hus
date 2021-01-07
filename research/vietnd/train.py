@@ -19,13 +19,12 @@ optim = torch.optim.AdamW(model.parameters(), lr=1e-5)
 max_epoch = 1
 
 
-def compute_loss(en, vi, true_label):
+def compute_loss(batch):
     """Computes the forward pass and returns the
-    cross entropy loss for each sample (en - vi).
+    cross entropy loss for batch data.
     """
-    logits = model(en, vi)
-    logits = logits.view(-1, logits.size(-1))
-    labels = torch.tensor([true_label]).to(device)
+    logits = model(batch["en"], batch["vi"])
+    labels = batch["label"].to(device)
     loss = criterion(logits, labels)
     return loss
 
@@ -34,11 +33,10 @@ def training_step(batch):
     """Training phase
     """
     model.train()
-    for x, y, z in zip(batch["en"], batch["vi"], batch["label"]):
-        optim.zero_grad()
-        loss = compute_loss(x, y, z)
-        loss.backward()
-        optim.step()
+    optim.zero_grad()
+    loss = compute_loss(batch)
+    loss.backward()
+    optim.step()
 
     return loss.item()
 
@@ -47,27 +45,22 @@ def eval_step(batch):
     """Evaluate step
     """
     model.eval()
-    loss = []
     with torch.no_grad():
-        for x, y, z in zip(batch["en"], batch["vi"], batch["label"]):
-            loss.append(compute_loss(x, y, z))
-    return sum(loss) / len(batch)
+        loss = compute_loss(batch)
+    return loss
 
 
 def multi_accu(batch):
     """Multiclass accuracy
     """
     logsoft = torch.nn.LogSoftmax(dim=1)
-    y_pred = []
     with torch.no_grad():
-        for x, y in zip(batch["en"], batch["vi"]):
-            out = model(x, y)
-            y_pred_softmax = logsoft(out)
-            _, y_pred_tags = torch.max(y_pred_softmax, dim=1)
-            y_pred.append(y_pred_tags.item())
+        out = model(batch["en"], batch["vi"])
+        labels = batch["label"]
+        y_pred_softmax = logsoft(out)
+        _, y_pred_tags = torch.max(y_pred_softmax, dim=1)
 
-    acc = (torch.tensor(y_pred) == batch["label"]).sum() / len(batch["label"])
-
+        acc = (y_pred_tags.cpu() == labels).sum() / len(labels)
     return acc.item()
 
 
@@ -78,17 +71,17 @@ def main(eval=True):
     train_xnli, test_xnli = train_test_split(en_vi_xnli, test_size=0.14)
     trainXNLI = xnliDataset(train_xnli)
     testXNLI = xnliDataset(test_xnli)
-    trainXNLI_dl = DataLoader(trainXNLI, 32, shuffle=True)
-    testXNLI_dl = DataLoader(testXNLI, 32, shuffle=False)
+    trainXNLI_dl = DataLoader(trainXNLI, 64, shuffle=True)
+    testXNLI_dl = DataLoader(testXNLI, 64, shuffle=False)
 
-    for epoch in range(1):
+    for epoch in range(max_epoch):
         print("Epoch = ", epoch+1)
         for i, batch in enumerate(trainXNLI_dl):
             loss = training_step(batch)
             if i % 5 == 0:
-                print(f"Training on batch {i} -- train loss {loss}")
+                print(f"Training on batch {i} -- train loss {loss:.3f}")
         for i, batch in enumerate(testXNLI_dl):
-            print(f"{i} --- {eval_step(batch)} --- {multi_accu(batch):.2%}")
+            print(f"Evaluating on batch {i} --- loss : {eval_step(batch):.3f} --- accu : {multi_accu(batch):.2%}")
 
     if eval:
         for index, row in tqdm(test_xnli.iterrows(), total=test_xnli.shape[0]):

@@ -2,6 +2,8 @@ import os
 import pip
 from collections import Iterable
 
+import wget
+
 
 def flatten(lis):
     """Flatten nested list
@@ -15,7 +17,7 @@ def flatten(lis):
 
 
 def check_vncorenlp(path):
-    """To check RDRSegmenter from VnCoreNLP exists or not
+    """To check RDRSegmenter from VnCoreNLP exists or not. If not, create folder and download it
     """
     try:
         import vncorenlp
@@ -24,5 +26,15 @@ def check_vncorenlp(path):
         print("Installing vncorenlp module")
         pip.main(['install', 'vncorenlp'])
 
-    if not os.path.exists(os.path.join(path, 'vncorenlp')):
-        raise Exception("You must download VnCoreNLP-1.1.1.jar & its word segmentation component and put it in the same working folder with model")
+    if not os.path.exists('vncorenlp_src'):
+        print("Create vncorenlp_src folder")
+        os.makedirs("vncorenlp_src/models/wordsegmenter")
+        print("Start downloading VnCoreNLP-1.1.1.jar & its word segmentation component")
+        url1 = 'https://raw.githubusercontent.com/vncorenlp/VnCoreNLP/master/VnCoreNLP-1.1.1.jar'
+        url2 = 'https://raw.githubusercontent.com/vncorenlp/VnCoreNLP/master/models/wordsegmenter/vi-vocab'
+        url3 = 'https://raw.githubusercontent.com/vncorenlp/VnCoreNLP/master/models/wordsegmenter/wordsegmenter.rdr'
+        wget.download(url1, 'vncorenlp_src/')
+        wget.download(url2, 'vncorenlp_src/models/wordsegmenter/')
+        wget.download(url3, 'vncorenlp_src/models/wordsegmenter/')
+
+    return True

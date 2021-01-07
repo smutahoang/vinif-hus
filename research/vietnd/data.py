@@ -9,8 +9,9 @@ from torch.utils.data import Dataset
 PATH = "/kaggle/input"
 
 
-def get_data(version="xnli"):
-    """
+def load_data(version="xnli"):
+    """Loading xnli or snli data
+     - xnli data from https://www.kaggle.com/mzr2017/xnli-data
     """
     try:
         if version == "xnli":

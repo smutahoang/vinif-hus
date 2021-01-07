@@ -1,6 +1,5 @@
 import os
 
-from vncorenlp import VnCoreNLP
 import torch
 import torch.nn.functional as F
 from transformers import RobertaTokenizer, RobertaModel
@@ -15,6 +14,12 @@ model_phobert_large = AutoModel.from_pretrained("vinai/phobert-large",
                                                 output_hidden_states=True)
 tokenizer_phobert_large = AutoTokenizer.from_pretrained("vinai/phobert-large",
                                                         use_fast=False)
+
+if checkvncorenlp(os.getcwd()):
+    from vncorenlp import VnCoreNLP
+    rdrsegmenter = VnCoreNLP("vncorenlp_src/VnCoreNLP-1.1.1.jar",
+                             annotators="wseg",
+                             max_heap_size='-Xmx500m')
 
 # XLM-R large
 tokenizer_xlmr_large = RobertaTokenizer.from_pretrained('roberta-large')
@@ -39,11 +44,6 @@ class MyEnsemble(torch.nn.Module):
         self.linear2 = torch.nn.Linear(1024, 128)
         self.linear3 = torch.nn.Linear(128, 3)
 
-        if checkvncorenlp(os.getcwd()):
-            self.rdrsegmenter = VnCoreNLP(os.getcwd() + "/vncorenlp/VnCoreNLP-1.1.1.jar",
-                                          annotators="wseg",
-                                          max_heap_size='-Xmx500m')
-
     def forward(self, en, vi):
         vector_en = self._output_xlmr(en)
         vector_vi = self._output_phobert(vi)
@@ -60,7 +60,7 @@ class MyEnsemble(torch.nn.Module):
         """
         def batch_process(list_text):
             sent = map(lambda x: ' '.join(list(flatten(x))),
-                       [self.rdrsegmenter.tokenize(i) for i in list_text])
+                       [rdrsegmenter.tokenize(i) for i in list_text])
             inputs = tokenizer_phobert_large(list(sent),
                                              return_tensors="pt",
                                              truncation=True,
@@ -68,7 +68,7 @@ class MyEnsemble(torch.nn.Module):
             return inputs
 
         if isinstance(text, str):
-            sentences = self.rdrsegmenter.tokenize(text)
+            sentences = rdrsegmenter.tokenize(text)
             inputs = tokenizer_phobert_large(' '.join(list(flatten(sentences))),
                                              return_tensors="pt",
                                              truncation=True,

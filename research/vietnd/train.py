@@ -15,50 +15,46 @@ from data import load_data, xnli_process, xnliDataset
 from model import MyEnsemble
 
 
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda:0" if use_cuda else "cpu")
-torch.backends.cudnn.benchmark = True
-
-model = MyEnsemble(device)
-model = model.to(device)
-criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-optim = torch.optim.AdamW(model.parameters(), lr=1e-5)
-
-
-def train_step(engine, batch):
+def run(train_dataloader, test_dataloader, cfg):
     """
     """
-    model.train()
-    optim.zero_grad()
-    y = batch["label"].to(device)
-    y_pred = model(batch["en"], batch["vi"])
-    loss = criterion(y_pred, y)
-    loss.backward()
-    optim.step()
+    cfg.cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if cfg.cuda else "cpu")
+    torch.backends.cudnn.benchmark = True
 
-    return loss.item()
+    model = MyEnsemble(cfg)
+    model = model.to(device)
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+    optim = torch.optim.AdamW(model.parameters(), lr=cfg.lr_rate)
 
-
-def validation_step(engine, batch):
-    """
-    """
-    model.eval()
-    with torch.no_grad():
+    def train_step(engine, batch):
+        """
+        """
+        model.train()
+        optim.zero_grad()
         y = batch["label"].to(device)
         y_pred = model(batch["en"], batch["vi"])
+        loss = criterion(y_pred, y)
+        loss.backward()
+        optim.step()
+
+        return loss.item()
+
+    def validation_step(engine, batch):
+        """
+        """
+        model.eval()
+        with torch.no_grad():
+            y = batch["label"].to(device)
+            y_pred = model(batch["en"], batch["vi"])
 
         return y_pred, y
 
+    def score_function(engine):
+        """Use accuracy to determine which model is saved
+        """
+        return engine.state.metrics['accuracy']
 
-def score_function(engine):
-    """Use accuracy to determine which model is saved
-    """
-    return engine.state.metrics['accuracy']
-
-
-def run(train_dataloader, test_dataloader, max_epochs, log_interval):
-    """
-    """
     trainer = Engine(train_step)
     evaluator = Engine(validation_step)
 
@@ -76,19 +72,19 @@ def run(train_dataloader, test_dataloader, max_epochs, log_interval):
 
     # Save model according to computed validation metric (accuracy)
     to_save = {'model': model}
-    handler = Checkpoint(to_save, DiskSaver(os.getcwd() + '/tmp/models', create_dir=True),
-                         n_saved=2,
+    handler = Checkpoint(to_save, DiskSaver(cfg.save_model_path, create_dir=True),
+                         n_saved=cfg.num_saved,
                          filename_prefix='best',
                          score_function=score_function,
                          score_name="val_acc",
                          global_step_transform=global_step_from_engine(trainer))
     evaluator.add_event_handler(Events.COMPLETED, handler)
 
-    @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
+    @trainer.on(Events.ITERATION_COMPLETED(every=cfg.log_interval))
     def log_training_loss(engine):
         # print("Epoch[{}] Loss: {:.2f}".format(trainer.state.epoch, trainer.state.output))
         pbar.desc = f"ITERATION - loss: {engine.state.output:.2f}"
-        pbar.update(log_interval)
+        pbar.update(cfg.log_interval)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_results(engine):
@@ -112,16 +108,17 @@ def run(train_dataloader, test_dataloader, max_epochs, log_interval):
     def log_time(engine):
         tqdm.write(f"{trainer.last_event_name.name} took {trainer.state.times[trainer.last_event_name.name]} seconds")
 
-    trainer.run(train_dataloader, max_epochs=max_epochs)
+    trainer.run(train_dataloader, max_epochs=cfg.max_epochs)
     pbar.close()
-    print(f"Best model is saved in {os.getcwd()}/tmp/models")
+    print(f"{cfg.num_saved} model is saved in {cfg.save_model_path}")
 
 
-def main():
+@hydra.main(config_name="config.yaml", strict=False)
+def main(cfg):
     """
     """
     if 'en_vi_xnli.pkl' not in os.listdir():
-        xnli_process(load_data(version="xnli"))
+        xnli_process(load_data(cfg, version="xnli"))
 
     with open('en_vi_xnli.pkl', 'rb') as f:
         raw = pickle.load(f)
@@ -129,10 +126,10 @@ def main():
     train_xnli, test_xnli = train_test_split(pd.DataFrame(raw), test_size=0.14)
     trainXNLI = xnliDataset(train_xnli)
     testXNLI = xnliDataset(test_xnli)
-    trainXNLI_dl = DataLoader(trainXNLI, 64, shuffle=True)
-    testXNLI_dl = DataLoader(testXNLI, 64, shuffle=False)
+    trainXNLI_dl = DataLoader(trainXNLI, cfg.train_bs, shuffle=True)
+    testXNLI_dl = DataLoader(testXNLI, cfg.test_bs, shuffle=False)
 
-    run(trainXNLI_dl, testXNLI_dl, max_epochs=1, log_interval=10)
+    run(trainXNLI_dl, testXNLI_dl, cfg)
 
 
 if __name__ == "__main__":

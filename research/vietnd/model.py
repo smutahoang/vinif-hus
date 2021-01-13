@@ -37,9 +37,9 @@ for param in model_xlmr_large.base_model.parameters():
 class MyEnsemble(torch.nn.Module):
     """
     """
-    def __init__(self, device):
+    def __init__(self, cfg):
         super(MyEnsemble, self).__init__()
-        self.device = device
+        self.cfg = cfg
         self.linear1 = torch.nn.Linear(1024*4, 1024)
         self.linear2 = torch.nn.Linear(1024, 128)
         self.linear3 = torch.nn.Linear(128, 3)
@@ -65,7 +65,7 @@ class MyEnsemble(torch.nn.Module):
             inputs = tokenizer_phobert_large(list(sent),
                                              return_tensors="pt",
                                              truncation=True,
-                                             padding=True).to(self.device)
+                                             padding=True).to(self.cfg.device)
             return inputs
 
         if isinstance(text, str):
@@ -73,14 +73,14 @@ class MyEnsemble(torch.nn.Module):
             inputs = tokenizer_phobert_large(' '.join(list(flatten(sentences))),
                                              return_tensors="pt",
                                              truncation=True,
-                                             padding=True).to(self.device)
+                                             padding=True).to(self.cfg.device)
         elif isinstance(text, list):
             inputs = batch_process(text)
 
         with torch.no_grad():
-            output_phobert = model_phobert_large(**inputs)
+            outputs = model_phobert_large(**inputs)
 
-        return output_phobert.pooler_output
+        return outputs[0][:, 0, :]
 
     def _output_xlmr(self, text):
         """Output from xlmr model
@@ -88,10 +88,10 @@ class MyEnsemble(torch.nn.Module):
         inputs = tokenizer_xlmr_large(text,
                                       return_tensors="pt",
                                       truncation=True,
-                                      padding=True).to(self.device)
+                                      padding=True).to(self.cfg.device)
         outputs = model_xlmr_large(**inputs)
 
-        return outputs.pooler_output
+        return outputs[0][:, 0, :]
 
     def _matching(self, en, vi):
         """Heuristic matching based on https://arxiv.org/pdf/1512.08422.pdf

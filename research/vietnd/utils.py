@@ -1,5 +1,4 @@
 import os
-import pip
 from collections import Iterable
 
 import wget
@@ -19,13 +18,6 @@ def flatten(lis):
 def check_vncorenlp(path):
     """To check RDRSegmenter from VnCoreNLP exists or not. If not, create folder and download it
     """
-    try:
-        import vncorenlp
-        print("module 'vncorenlp' is installed")
-    except ModuleNotFoundError:
-        print("Installing vncorenlp module")
-        pip.main(['install', 'vncorenlp'])
-
     if not os.path.exists('vncorenlp_src'):
         print("Create vncorenlp_src folder")
         os.makedirs("vncorenlp_src/models/wordsegmenter")

@@ -1,0 +1,21 @@
+# Config file for train, eval and export params
+
+# Dataset path
+dataset:
+  xnli: '/Users/vietnd/Datasets/XNLI-1.0'
+  snli: '/Users/vietnd/Datasets/SNLI'
+
+# Device config:
+device: 'cpu'  # change to gpu:0 if gpu is available
+
+# Parameters
+max_epochs: 10
+train_bs: 64
+test_bs: 64
+lr_rate: 1e-5
+
+# Saved model path
+save_model_path: ${env:PWD}
+
+
+

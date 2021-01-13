@@ -40,19 +40,20 @@ class MyEnsemble(torch.nn.Module):
     def __init__(self, device):
         super(MyEnsemble, self).__init__()
         self.device = device
-        self.linear1 = torch.nn.Linear(4096, 1024)
+        self.linear1 = torch.nn.Linear(1024*4, 1024)
         self.linear2 = torch.nn.Linear(1024, 128)
         self.linear3 = torch.nn.Linear(128, 3)
+        self.dropout = torch.nn.Dropout(p=0.2)
 
     def forward(self, en, vi):
         vector_en = self._output_xlmr(en)
         vector_vi = self._output_phobert(vi)
         x = self._matching(vector_en, vector_vi)
-        x = self.linear1(x)
-        x = F.relu(x)
-        x = self.linear2(x)
-        x = F.relu(x)
-        x = self.linear3(x)
+        x = self.dropout(x)
+        x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))
+        x = F.relu(self.linear3(x))
+
         return x
 
     def _output_phobert(self, text):

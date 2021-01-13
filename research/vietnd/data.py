@@ -1,47 +1,47 @@
-import glob
 import pickle
 
+import tqdm
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 
-PATH = "/kaggle/input"
-
-
-def load_data(version="xnli"):
+def load_data(version="xnli", path=None):
     """Loading xnli or snli data
-     - xnli data from https://www.kaggle.com/mzr2017/xnli-data
     """
+    assert version in ["xnli", "snli"], "Should be xnli or snli"
     try:
         if version == "xnli":
-            test_xnli_raw = pd.read_csv(PATH + "/xnli-data/xnli/test.tsv", sep='\t', header=0, error_bad_lines=False)
-            dev_xnli_raw = pd.read_csv(PATH + "/xnli-data/xnli/dev.tsv", sep='\t', header=0, error_bad_lines=False)
+            test_xnli_raw = pd.read_csv(path + "/XNLI-1.0/xnli.test.tsv", sep='\t', header=0, error_bad_lines=False)
+            dev_xnli_raw = pd.read_csv(path + "/XNLI-1.0/xnli.dev.tsv", sep='\t', header=0, error_bad_lines=False)
             return test_xnli_raw, dev_xnli_raw
         elif version == "snli":
-            with open("/kaggle/input/translated-snli/snli_1.0_translated.pkl", "rb") as f:
+            with open(path + "snli_1.0_translated.pkl", "rb") as f:
                 snli_raw = pickle.load(f)
                 return snli_raw
-    except:
-        print("Should be xnli or snli")
+    except FileNotFoundError:
+        print("Invalid path")
 
 
 def xnli_process(xnli_raw_data):
     """
     """
     test_raw, dev_raw = xnli_raw_data
-    # Get all of vietnamese sentence pairs from xnli
-    vi = pd.concat([test_raw.loc[test_raw.language == 'vi'],
-                    dev_raw.loc[dev_raw.language == 'vi']]).reset_index(drop=True)
-    # Get all of en sentence pairs from xnli
-    en = pd.concat([test_raw.loc[test_raw.language == 'en'],
-                    dev_raw.loc[dev_raw.language == 'en']]).reset_index(drop=True)
+    raw = pd.concat((test_raw, dev_raw)).reset_index(drop=True)
+    del test_raw, dev_raw
+    rs = {'label': [],
+          'en': [],
+          'vi': []}
+    pbar = tqdm(total=7500)
+    for i in raw.loc[raw.language == 'en', ['pairID']].iterrows():
+        rs['label'].append(raw.iloc[i[0], 1])
+        rs['en'].append(raw.iloc[i[0], 6])
+        rs['vi'].append(raw.loc[(raw.language == 'vi') & (raw.pairID == i[1].pairID), 'sentence2'].values[0])
+        pbar.update(1)
+    pbar.close()
 
-    en_vi_xnli = pd.DataFrame({"label": vi.gold_label,
-                               "premise": en.sentence1,
-                               "hypothesis": vi.sentence2})
-
-    return en_vi_xnli
+    with open('en_vi_xnli.pkl', 'wb') as handle:
+        pickle.dump(rs, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def snli_process():
@@ -62,7 +62,15 @@ class xnliDataset(Dataset):
 
         return {"en": self.content.iloc[idx, 1],
                 "vi": self.content.iloc[idx, 2],
-                "label": self.content.iloc[idx, 0]}
+                "label": self._get_label(self.content.iloc[idx, 0])}
 
     def __len__(self):
         return len(self.content)
+
+    def _get_label(self, x):
+        label = {'contradiction': 0,
+                 'neutral': 1,
+                 'entailment': 2,
+                 }
+
+        return label[x]

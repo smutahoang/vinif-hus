@@ -6,17 +6,23 @@ import torch
 from torch.utils.data import Dataset
 
 
-def load_data(version="xnli", path=None):
+def load_data(cfg, version="xnli"):
     """Loading xnli or snli data
     """
     assert version in ["xnli", "snli"], "Should be xnli or snli"
     try:
         if version == "xnli":
-            test_xnli_raw = pd.read_csv(path + "/XNLI-1.0/xnli.test.tsv", sep='\t', header=0, error_bad_lines=False)
-            dev_xnli_raw = pd.read_csv(path + "/XNLI-1.0/xnli.dev.tsv", sep='\t', header=0, error_bad_lines=False)
+            test_xnli_raw = pd.read_csv(cfg.xnli + "/xnli.test.tsv",
+                                        sep='\t',
+                                        header=0,
+                                        error_bad_lines=False)
+            dev_xnli_raw = pd.read_csv(cfg.xnli + "/xnli.dev.tsv",
+                                       sep='\t',
+                                       header=0,
+                                       error_bad_lines=False)
             return test_xnli_raw, dev_xnli_raw
         elif version == "snli":
-            with open(path + "snli_1.0_translated.pkl", "rb") as f:
+            with open(cfg.snli + "/snli_1.0_translated.pkl", "rb") as f:
                 snli_raw = pickle.load(f)
                 return snli_raw
     except FileNotFoundError:

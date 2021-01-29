@@ -10,22 +10,26 @@ from sklearn.model_selection import train_test_split
 from ignite.engine import Engine, Events
 from ignite.metrics import Accuracy, Loss
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
+import transformers
 
-from data import load_data, xnli_process, xnliDataset
+from data import load_data, xnli_process, Dataset
 from model import MyEnsemble
+from optimizer import RAdam
 
 
 def run(train_dataloader, test_dataloader, cfg):
     """
     """
-    cfg.cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if cfg.cuda else "cpu")
+    cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
     model = MyEnsemble(cfg)
     model = model.to(device)
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-    optim = torch.optim.AdamW(model.parameters(), lr=cfg.lr_rate)
+    criterion = torch.nn.CrossEntropyLoss()
+    optim_params = {'lr': 2e-4, 'eps': 1e-6}
+    optim = transformers.AdamW(model.parameters(), lr=cfg.lr_rate)
+    # optim = RAdam(filter(lambda p: p.requires_grad, model.parameters()), **optim_params)
 
     def train_step(engine, batch):
         """
@@ -113,19 +117,27 @@ def run(train_dataloader, test_dataloader, cfg):
     print(f"{cfg.num_saved} model is saved in {cfg.save_model_path}")
 
 
-@hydra.main(config_name="config.yaml", strict=False)
+@hydra.main(config_name="config.yaml")
 def main(cfg):
     """
     """
-    if 'en_vi_xnli.pkl' not in os.listdir():
-        xnli_process(load_data(cfg, version="xnli"))
+    if 'xnli' in cfg.use_dataset:
+        if 'en_vi_xnli.pkl' not in os.listdir(cfg.dataset.xnli):
+            xnli_process(load_data(cfg, version="xnli"))
 
-    with open('en_vi_xnli.pkl', 'rb') as f:
-        raw = pickle.load(f)
+        with open(cfg.dataset.xnli + '/en_vi_xnli.pkl', 'rb') as f:
+            raw = pickle.load(f)
+    elif 'snli' in cfg.use_dataset:
+        if 'en_vi_snli.pkl' not in os.listdir(cfg.dataset.snli):
+            xnli_process(load_data(cfg, version="snli"))
 
-    train_xnli, test_xnli = train_test_split(pd.DataFrame(raw), test_size=0.14)
-    trainXNLI = xnliDataset(train_xnli)
-    testXNLI = xnliDataset(test_xnli)
+        with open(cfg.dataset.xnli + '/en_vi_snli.pkl', 'rb') as f:
+            raw = pickle.load(f)
+    else:
+        raise NotImplementedError("use_dataset in config.yaml must be 'xnli' or 'snli'")
+    train_xnli, test_xnli = train_test_split(pd.DataFrame(raw), test_size=cfg.test_size)
+    trainXNLI = Dataset(train_xnli, version=cfg.use_dataset)
+    testXNLI = Dataset(test_xnli, version=cfg.use_dataset)
     trainXNLI_dl = DataLoader(trainXNLI, cfg.train_bs, shuffle=True)
     testXNLI_dl = DataLoader(testXNLI, cfg.test_bs, shuffle=False)
 

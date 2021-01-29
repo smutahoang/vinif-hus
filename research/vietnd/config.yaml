@@ -1,17 +1,27 @@
 # Config file for train, eval and export params
 
+# Model
+model:
+  en: xlmr-base
+  vi: phobert-base
+
 # Dataset path
 dataset:
   xnli: /Users/vietnd/Datasets/XNLI-1.0
   snli: /Users/vietnd/Datasets/SNLI
 
-# cuda config:
-cuda: false  # CPU
+# Choose dataset
+use_dataset: xnli
+
+# # cuda config:
+# cuda: False
+# device: cpu
 
 # Parameters
+test_size: 0.15
 max_epochs: 10
-train_bs: 64
-test_bs: 64
+train_bs: 32
+test_bs: 32
 lr_rate: 1e-5
 
 # Saved model path
@@ -22,7 +32,3 @@ num_saved: 2
 
 #
 log_interval: 10
-
-
-
-

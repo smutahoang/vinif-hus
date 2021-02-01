@@ -24,12 +24,14 @@ def run(train_dataloader, test_dataloader, cfg):
     device = torch.device("cuda:0" if cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    model = MyEnsemble(cfg)
+    model = MyEnsemble(device, cfg)
     model = model.to(device)
     criterion = torch.nn.CrossEntropyLoss()
-    optim_params = {'lr': 2e-4, 'eps': 1e-6}
-    optim = transformers.AdamW(model.parameters(), lr=cfg.lr_rate)
-    # optim = RAdam(filter(lambda p: p.requires_grad, model.parameters()), **optim_params)
+    optim_params = {'lr': cfg.lr_rate, 'eps': cfg.eps}
+    if cfg.optimizer == "AdamW":
+        optim = transformers.AdamW(model.parameters(), **optim_params)
+    elif cfg.optimizer == "RAdam":
+        optim = RAdam(filter(lambda p: p.requires_grad, model.parameters()), **optim_params)
 
     def train_step(engine, batch):
         """

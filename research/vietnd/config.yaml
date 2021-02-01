@@ -22,7 +22,9 @@ test_size: 0.15
 max_epochs: 10
 train_bs: 32
 test_bs: 32
-lr_rate: 1e-5
+lr_rate: 2e-4
+eps: 1e-6
+optimizer: RAdam
 
 # Saved model path
 save_model_path: ${env:PWD}/tmp/models

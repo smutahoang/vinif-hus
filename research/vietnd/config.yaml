@@ -29,6 +29,9 @@ optimizer: RAdam
 # Saved model path
 save_model_path: ${env:PWD}/tmp/models
 
+# Log path
+log_tensorboard_path: ${env:PWD}/experiments/tb_logs
+
 # number of saved model
 num_saved: 2
 

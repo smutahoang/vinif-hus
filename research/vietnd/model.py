@@ -9,11 +9,11 @@ from utils import flatten, check_vncorenlp
 
 
 # PhoBert large
-model_phobert_large = AutoModel.from_pretrained("vinai/phobert-base",
-                                                return_dict=True,
-                                                output_hidden_states=True)
-tokenizer_phobert_large = AutoTokenizer.from_pretrained("vinai/phobert-base",
-                                                        use_fast=False)
+model_phobert = AutoModel.from_pretrained("vinai/phobert-base",
+                                          return_dict=True,
+                                          output_hidden_states=True)
+tokenizer_phobert = AutoTokenizer.from_pretrained("vinai/phobert-base",
+                                                  use_fast=False)
 
 if check_vncorenlp(os.getcwd()):
     from vncorenlp import VnCoreNLP
@@ -22,15 +22,15 @@ if check_vncorenlp(os.getcwd()):
                              max_heap_size='-Xmx500m')
 
 # XLM-R large
-tokenizer_xlmr_large = RobertaTokenizer.from_pretrained('roberta-base')
-model_xlmr_large = RobertaModel.from_pretrained('roberta-base',
-                                                return_dict=True,
-                                                output_hidden_states=True)
+tokenizer_xlmr = RobertaTokenizer.from_pretrained('roberta-base')
+model_xlmr = RobertaModel.from_pretrained('roberta-base',
+                                          return_dict=True,
+                                          output_hidden_states=True)
 
 # Freeze model
-for param in model_phobert_large.base_model.parameters():
+for param in model_phobert.base_model.parameters():
     param.requires_grad = False
-for param in model_xlmr_large.base_model.parameters():
+for param in model_xlmr.base_model.parameters():
     param.requires_grad = False
 
 
@@ -52,7 +52,7 @@ class MyEnsemble(torch.nn.Module):
         vector_vi = self._encode(self._output_phobert, vi)
         x = self._matching(vector_en, vector_vi)
         x = self.dropout(self.dense(x))
-        x = torch.tanh(x)
+        x = F.gelu(x)
         x = self.out_proj(x)
 
         return x
@@ -63,33 +63,33 @@ class MyEnsemble(torch.nn.Module):
         def batch_process(list_text):
             sent = map(lambda x: ' '.join(list(flatten(x))),
                        [rdrsegmenter.tokenize(i) for i in list_text])
-            inputs = tokenizer_phobert_large(list(sent),
-                                             return_tensors="pt",
-                                             truncation=True,
-                                             padding=True).to(self.device)
+            inputs = tokenizer_phobert(list(sent),
+                                       return_tensors="pt",
+                                       truncation=True,
+                                       padding=True).to(self.device)
             return inputs
 
         if isinstance(text, str):
             sentences = rdrsegmenter.tokenize(text)
-            inputs = tokenizer_phobert_large(' '.join(list(flatten(sentences))),
-                                             return_tensors="pt",
-                                             truncation=True,
-                                             padding=True).to(self.device)
+            inputs = tokenizer_phobert(' '.join(list(flatten(sentences))),
+                                       return_tensors="pt",
+                                       truncation=True,
+                                       padding=True).to(self.device)
         elif isinstance(text, list):
             inputs = batch_process(text)
 
-        outputs = model_phobert_large(**inputs)
+        outputs = model_phobert(**inputs)
 
         return inputs, outputs
 
     def _output_xlmr(self, text):
         """Output from xlmr model
         """
-        inputs = tokenizer_xlmr_large(text,
-                                      return_tensors="pt",
-                                      truncation=True,
-                                      padding=True).to(self.device)
-        outputs = model_xlmr_large(**inputs)
+        inputs = tokenizer_xlmr(text,
+                                return_tensors="pt",
+                                truncation=True,
+                                padding=True).to(self.device)
+        outputs = model_xlmr(**inputs)
 
         return inputs, outputs
 

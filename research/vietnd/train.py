@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from ignite.engine import Engine, Events
 from ignite.metrics import Accuracy, Loss
 from ignite.handlers import Checkpoint, DiskSaver, global_step_from_engine
+from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, GradsScalarHandler, GradsHistHandler
 import transformers
 
 from data import load_data, xnli_process, Dataset
@@ -26,12 +27,22 @@ def run(train_dataloader, test_dataloader, cfg):
 
     model = MyEnsemble(device, cfg)
     model = model.to(device)
+
     criterion = torch.nn.CrossEntropyLoss()
+
+    param_optimizer = list(model.named_parameters())
+    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
     optim_params = {'lr': cfg.lr_rate, 'eps': cfg.eps}
     if cfg.optimizer == "AdamW":
-        optim = transformers.AdamW(model.parameters(), **optim_params)
+        optim = transformers.AdamW(optimizer_grouped_parameters, **optim_params)
     elif cfg.optimizer == "RAdam":
-        optim = RAdam(filter(lambda p: p.requires_grad, model.parameters()), **optim_params)
+        optim = RAdam(optimizer_grouped_parameters, **optim_params)
+    elif cfg.optimizer == "Adam":
+        optim = torch.optim.Adam(optimizer_grouped_parameters, **optim_params)
 
     def train_step(engine, batch):
         """
@@ -71,12 +82,12 @@ def run(train_dataloader, test_dataloader, cfg):
     # Print accuracy and loss value when validating
     val_metrics = {
         "accuracy": Accuracy(),
-        "cel": Loss(criterion)
+        "loss": Loss(criterion)
     }
     for name, metric in val_metrics.items():
         metric.attach(evaluator, name)
 
-    # Save model according to computed validation metric (accuracy)
+    # Save model according to computed validation's metric (accuracy)
     to_save = {'model': model}
     handler = Checkpoint(to_save, DiskSaver(cfg.save_model_path, create_dir=True),
                          n_saved=cfg.num_saved,
@@ -85,6 +96,40 @@ def run(train_dataloader, test_dataloader, cfg):
                          score_name="val_acc",
                          global_step_transform=global_step_from_engine(trainer))
     evaluator.add_event_handler(Events.COMPLETED, handler)
+
+    # Create tensorboard logger
+    tb_logger = TensorboardLogger(log_dir=cfg.log_tensorboard_path)
+
+    # Attach the logger to the trainer to log model's gradients norm after each iteration (batch)
+    tb_logger.attach(
+        trainer,
+        event_name=Events.ITERATION_COMPLETED,
+        log_handler=GradsScalarHandler(model)
+    )
+
+    # Attach the logger to the trainer to log model's gradients as a histogram after each epoch
+    tb_logger.attach(
+        trainer,
+        event_name=Events.EPOCH_COMPLETED,
+        log_handler=GradsHistHandler(model)
+    )
+
+    # Attach the logger to the trainer to log training loss at each iteration
+    tb_logger.attach_output_handler(
+        trainer,
+        event_name=Events.ITERATION_COMPLETED,
+        tag="training",
+        output_transform=lambda loss: {"loss": loss}
+    )
+
+    # Attach the logger to the evaluator on the validation dataset after each epoch
+    tb_logger.attach_output_handler(
+        evaluator,
+        event_name=Events.EPOCH_COMPLETED,
+        tag="validation",
+        metric_names=["loss", "accuracy"],
+        global_step_transform=global_step_from_engine(trainer)
+    )
 
     @trainer.on(Events.ITERATION_COMPLETED(every=cfg.log_interval))
     def log_training_loss(engine):
@@ -99,7 +144,7 @@ def run(train_dataloader, test_dataloader, cfg):
         metrics = evaluator.state.metrics
         # print("Training Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}".format(trainer.state.epoch, metrics["accuracy"], metrics["cel"]))
         tqdm.write("Training Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}"
-                   .format(trainer.state.epoch, metrics["accuracy"], metrics["cel"]))
+                   .format(trainer.state.epoch, metrics["accuracy"], metrics["loss"]))
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(engine):
@@ -107,7 +152,7 @@ def run(train_dataloader, test_dataloader, cfg):
         metrics = evaluator.state.metrics
         # print("Validation Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}".format(trainer.state.epoch, metrics["accuracy"], metrics["cel"]))
         tqdm.write("Validation Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}" \
-                   .format(trainer.state.epoch, metrics["accuracy"], metrics["cel"]))
+                   .format(trainer.state.epoch, metrics["accuracy"], metrics["loss"]))
         pbar.n = pbar.last_print_n = 0
 
     @trainer.on(Events.EPOCH_COMPLETED | Events.COMPLETED)
@@ -116,6 +161,7 @@ def run(train_dataloader, test_dataloader, cfg):
 
     trainer.run(train_dataloader, max_epochs=cfg.max_epochs)
     pbar.close()
+    tb_logger.close()
     print(f"{cfg.num_saved} model is saved in {cfg.save_model_path}")
 
 

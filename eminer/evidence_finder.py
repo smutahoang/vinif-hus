@@ -54,7 +54,7 @@ def infer_entailment(articles, post, method='allen'):
         # TODO: to be implemented
         pass
     for a in articles:
-        relevant_sentences = nlp.get_relevant_sentence(a['paragraphs'])
+        relevant_sentences = nlp.get_relevant_sentence(a['paragraphs'], post)
         a['relevant_sentences'] = [{'text': s,
                                     'entailment': recognizer.infer_entailment(s, post)} for s in
                                    relevant_sentences]

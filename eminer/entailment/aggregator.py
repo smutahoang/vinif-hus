@@ -1,16 +1,25 @@
 # to determine entailment label between a document and a post by aggregating the labels
 # between the document's sentences and the post
+import numpy as np
 
-def avg(sentences, post):
+
+def avg(article):
     """
     aggregating by simple averaging
-    :param sentences:
+    :param article:
     :param post:
-    :return:
+    :return: dict
+        {
+            "entailment": mean of prob. value over all relevant sentences
+            "neutral": ~
+            "contradiction": ~
+        }
     """
-
-    # TODO: to be implemented
-    pass
+    rs = []
+    for k in article["releven_sentences"]:
+        rs.append(list(k["entailment"].values()))
+    rs = np.array(rs).mean(axis=0).round(3).tolist()
+    return dict(zip(["entailment", "neutral", "contradiction"], rs))
 
 
 def aggregate(sentences, method='avg'):
@@ -21,7 +30,7 @@ def aggregate(sentences, method='avg'):
     :return: either 'support', 'refuse', or 'not-determined'
     """
     if method == 'avg':
-        return avg(sentences, post)
+        return max(avg(sentences).items(), key=lambda x: x[1])[0]
     else:
         # TODO: to be implemented
         pass

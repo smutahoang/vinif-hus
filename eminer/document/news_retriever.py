@@ -1,6 +1,7 @@
-# to retrieve a list of news articles relevant to a set of keywords
+from search_engine import search
 
-def search(keyword, sources, search_engine='Google', top_k=10):
+
+def search_articles(keyword, sources, search_engine='Google', top_k=10):
     """
     make use of the search-engine to find news articles from sources that are relevant to keywords,
     and then extract the top-k links returned by the engine
@@ -10,9 +11,11 @@ def search(keyword, sources, search_engine='Google', top_k=10):
     :param top_k: number of top result to retrieve
     :return: list of top-k links return by the search engine
     """
+    result = {}
+    for source in sources:
+        result[source] = [i.link for i in search(keyword, source, top_k, search_engine)]
 
-    # TODO: to be implemented
-    pass
+    return result
 
 
 def extract_news(url):
@@ -48,7 +51,8 @@ def retrieve(keywords, sources, search_engine='Google', top_k=10):
     """
     urls = []
     for keyword in keywords:
-        urls.append(search(keyword, sources, search_engine=search_engine, top_k=top_k))
+        urls.append(search_articles(keyword, sources, search_engine=search_engine, top_k=top_k))
     urls = set(urls)
     articles = [extract_news(url) for url in urls]
+
     return articles

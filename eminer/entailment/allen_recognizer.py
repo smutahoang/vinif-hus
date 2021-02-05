@@ -1,7 +1,10 @@
 # make use of google translate API and Allen NLP's toolbox for entailment recognition
 # Allen NLP toolbox: https://demo.allennlp.org/textual-entailment
+from allennlp.predictors.predictor import Predictor
+import cld3
 
-def google_translate(sentence, api_key):
+
+def google_translate(sentence, api_key=None):
     """
     to translate a sentence in Vietnamese into English
 
@@ -19,11 +22,10 @@ def lang_detect(text):
     :param text: string
     :return: either 'en', 'vi', or 'other' for English, Vietnamese, and Others respectively
     """
-    # TODO: to be implemented
-    pass
+    return cld3.get_language(text)[0]
 
 
-def infer_entailment(sentence1, sentence2, api_key):
+def infer_entailment(sent1, sent2, api_key):
     """
     infer entailment between sentence1 and sentence2, translate into English if needed
     :param sentence1: string, the first sentence
@@ -36,6 +38,11 @@ def infer_entailment(sentence1, sentence2, api_key):
             'neutral': neutral  probability
         }
     """
-    # TODO: to be implemented
+    predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/mnli-roberta-2020-07-29.tar.gz")
+    params = {'premise': google_translate(sent1) if lang_detect(sent1) != 'en' else sent1,
+              'hypothesis': google_translate(sent2) if lang_detect(sent2) != 'en' else sent2
+              }
 
-    pass
+    rs = predictor.predict(**params)
+
+    return dict(zip(["entailment", "contradiction", "neutral"], rs["prob"]))

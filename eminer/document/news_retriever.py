@@ -1,4 +1,5 @@
 from search_engine import search
+from get_content import get_news
 
 
 def search_articles(keyword, sources, search_engine='Google', top_k=10):
@@ -30,8 +31,7 @@ def extract_news(url):
             "images": list of images included in the news
         }
     """
-    # TODO: to be implemented
-    pass
+    return get_news(url)
 
 
 def retrieve(keywords, sources, search_engine='Google', top_k=10):

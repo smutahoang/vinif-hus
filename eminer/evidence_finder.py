@@ -1,4 +1,4 @@
-from keyword import yake, nlp
+from keywords import yake, snlp, bert
 from document import news_retriever
 from entailment import allen_recognizer
 from entailment import aggregator
@@ -9,7 +9,8 @@ information_sources = ['cnn.com',
                        'nytimes.com',
                        'washingtonpost.com',
                        'vnexpress.net',
-                       'dantri.com']
+                       'dantri.com',
+                       'zing.vn']
 
 
 def extract_keywords(post, method):
@@ -21,11 +22,12 @@ def extract_keywords(post, method):
     """
     if method == 'yake':
         return yake.get_keywords(post)
-    elif method == 'nlp':
-        return nlp.get_keywords(post)
+    elif method == 'snlp':
+        return snlp.get_keywords(post)
+    elif method == 'bert':
+        return bert.get_keywords(post)
     else:
-        # TODO: to be implemented
-        pass
+        raise NotImplementedError("must be yake or snlp or bert")
 
 
 def retrieve_articles(keywords, sources):
@@ -60,6 +62,8 @@ def infer_entailment(articles, post, method='allen'):
                                    relevant_sentences]
         a['entailment'] = aggregator.aggregate(a['relevant_sentences'])
 
+    return articles
+
 
 def summarize(articles):
     """
@@ -74,13 +78,12 @@ def summarize(articles):
     return evidences
 
 
-def find_evidence(post):
+def find_evidence(post, keyword_method, entail_method):
     """
 
     :param post:
     :return:
     """
-    keywords = yake.get_keywords(post)
+    keywords = extract_keywords(post, method=keyword_method)
     articles = retrieve_articles(keywords, information_sources)
-    infer_entailment(articles, post)
-    return summarize(articles)
+    return summarize(infer_entailment(articles, post, method=entail_method))

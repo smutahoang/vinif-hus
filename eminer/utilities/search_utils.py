@@ -2,9 +2,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 
-import urllib.request
-import urllib.error
-import urllib.parse
+import requests
 from urllib.parse import urlencode
 from fake_useragent import UserAgent
 
@@ -44,13 +42,11 @@ def _get_html(url):
     """
     # ua = UserAgent()
     # header = ua.random
-    header = "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+    header = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
 
     try:
-        request = urllib.request.Request(url)
-        request.add_header("User-Agent", header)
-        html = urllib.request.urlopen(request).read()
-        return html
+        r = requests.get(url, headers=header)
+        return r.content
     except Exception as e:
         print("Error accessing:", url)
         print(e)

@@ -12,6 +12,7 @@ from utilities.search_utils import _get_search_url, _get_html
 class SearchResult(object):
     """Represents a google/bing search result.
     """
+
     def __init__(self):
         self.name = None  # The title of the link
         self.link = None  # The external link
@@ -54,13 +55,16 @@ def search(query, site=None, num=10, lang='en', engine='google'):
 
     results = []
     url = _get_search_url(query, site=site, num=num, lang=lang, search_engine=engine)
+    # print('url = ', url)
     html = _get_html(url)
+    # print('html = ', html)
     if html:
         soup = BeautifulSoup(html, "lxml")
         if engine == 'google':
             r = soup.findAll("div", attrs={"class": "g"})
         elif engine == 'bing':
             r = soup.findAll("li", attrs={"class": "b_algo"})
+        # print('r = ', r)
         for li in r:
             res = SearchResult()
             res.name = _get_name(li, engine)

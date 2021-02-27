@@ -98,7 +98,7 @@ if __name__ == '__main__':
     idx_to_label = pickle.load(open(r"/home/hoang/qnt/data_nli/nli-idx_to_label_full.pkl", 'rb'))
 
     nli_xlmr_classifier = NliXlmrClassifier(r'/home/hoang/qnt/NLI_MBERT_120Epoch_full.bk',idx_to_label,device='cuda')
-    # nli_xlmr_classifier = NliXlmrClassifier(r'/home/hoang/qnt/NLI_XLMR_100Epoch_full.bk',idx_to_label,device='cpu')
+    # nli_xlmr_classifier = NliMBertClassifier(r'/home/hoang/qnt/NLI_XLMR_100Epoch_full.bk',idx_to_label,device='cpu')
     makeOrder = nli_xlmr_classifier.make_order
     xdata = []
     labels = []
